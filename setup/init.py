@@ -1,19 +1,25 @@
+import os
 import argparse
 import googleapiclient.discovery
 import googleapiclient.errors
+import chromadb
 from youtube_transcript_api import YouTubeTranscriptApi
 from chroma_vector_db import ChromaVectorDB
+from tdqm import tqdm
+
+import node
 
 def main(playlist_id):
     # Define the YouTube API client
-    youtube = googleapiclient.discovery.build("youtube", "v3", developerKey="YOUR_API_KEY_HERE")
+    youtube_api_key = os.environ['YOUTUBE_DATA_API_KEY']
+    youtube = googleapiclient.discovery.build("youtube", "v3", developerKey=youtube_api_key)
 
     # Get the playlist items
     playlist_items = []
     next_page_token = None
     while True:
         request = youtube.playlistItems().list(
-            part="snippet",
+            part="contentDetails",
             playlistId=playlist_id,
             maxResults=50,
             pageToken=next_page_token
@@ -25,37 +31,32 @@ def main(playlist_id):
             break
 
     # Get the video IDs from the playlist items
-    video_ids = [item["snippet"]["resourceId"]["videoId"] for item in playlist_items]
-
-    # Get the metadata for each video
-    videos = []
-    for video_id in video_ids:
-        request = youtube.videos().list(
-            part="snippet",
-            id=video_id
-        )
-        response = request.execute()
-        videos += response["items"]
+    video_ids = [item["contentDetails"]["videoId"] for item in playlist_items]
 
     # Get the transcripts for each video
-    transcripts = []
-    for video_id in video_ids:
-        try:
-            transcript = YouTubeTranscriptApi.get_transcript(video_id)
-            transcripts.append(transcript)
-        except:
-            transcripts.append([])
+    transcripts = YouTubeTranscriptApi.get_transcripts(video_ids, languages=["en"], continue_after_error=True)
 
-    # Chunk the transcripts into nodes
+    # Create the nodes
     nodes = []
-    for transcript in transcripts:
-        for i in range(0, len(transcript), 10):
-            nodes.append(transcript[i:i+10])
+    for video_id, transcript in transcripts.items():
+        new_node = node.YTVideo(video_id, transcript)
+        nodes.append(new_node)
 
     # Insert the nodes into the local persistent ChromaVectorDB
-    db = ChromaVectorDB("YOUR_DB_PATH_HERE")
-    for node in nodes:
-        db.insert(node)
+    save_path = os.path.join(os.path.dirname(__file__), '../data/')
+    client = chromadb.PersistentClient(save_path)
+    collection = client.create_collection(name='dental_history')
+    for node in tdqm(nodes):
+        transcripts = node.get_chunk_transcripts()
+        metadatas = node.get_chunk_metadatas()
+        ids = node.get_chunk_ids()
+        embeddings = node.get_chunk_embeddings()
+        collection.add(
+            embeddings=embeddings,
+            documents=transcripts,
+            metadatas=metadatas,
+            ids=ids
+        )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process playlist ID.')
