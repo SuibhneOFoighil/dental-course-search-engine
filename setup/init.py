@@ -4,12 +4,15 @@ import googleapiclient.discovery
 import googleapiclient.errors
 import chromadb
 from youtube_transcript_api import YouTubeTranscriptApi
-from chroma_vector_db import ChromaVectorDB
-from tdqm import tqdm
+from tqdm import tqdm
+from dotenv import load_dotenv
 
-import node
+load_dotenv()
+
+from node import YTVideo
 
 def main(playlist_id):
+
     # Define the YouTube API client
     youtube_api_key = os.environ['YOUTUBE_DATA_API_KEY']
     youtube = googleapiclient.discovery.build("youtube", "v3", developerKey=youtube_api_key)
@@ -38,15 +41,19 @@ def main(playlist_id):
 
     # Create the nodes
     nodes = []
-    for video_id, transcript in transcripts.items():
-        new_node = node.YTVideo(video_id, transcript)
+    for video_id, transcript in transcripts[0].items():
+        new_node = YTVideo(video_id, transcript)
         nodes.append(new_node)
 
     # Insert the nodes into the local persistent ChromaVectorDB
     save_path = os.path.join(os.path.dirname(__file__), '../data/')
     client = chromadb.PersistentClient(save_path)
-    collection = client.create_collection(name='dental_history')
-    for node in tdqm(nodes):
+    try:
+        collection = client.create_collection(name='dental_history')
+    except chromadb.db.base.UniqueConstraintError:
+        collection = client.get_collection(name='dental_history')
+
+    for node in tqdm(nodes):
         transcripts = node.get_chunk_transcripts()
         metadatas = node.get_chunk_metadatas()
         ids = node.get_chunk_ids()
