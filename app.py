@@ -4,6 +4,10 @@ from ai import RagAgent
 from message import Message
 from utils import extract_reference_numbers
 
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
