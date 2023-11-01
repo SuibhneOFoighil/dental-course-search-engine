@@ -127,15 +127,37 @@ def main():
 
         %Formatting Instructions%
         If you make a claim, you must reference the supporting summaries. Only cite the reference numbers and always cite them individually in your response, like so: 'I have always supported dogs (1)(2).' or 'I have always supported dogs (1) and cats (2).'
-
-        %Summaries%
-        {str_summaries}
         """
+
         print("COMBINING the summaries...")
+        
+        #Simulating a function call to the OpenAI API
+        functions = [
+            {
+                "name": f"get_summaries",
+                "description": f"Returns summaries from the course material.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": f"The query to be answered. Example: 'What is the definition of orthodontics?'"
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        ]
+
+        function_result = str_summaries
+
         # Generate summaries from the selected docs
         result = openai.ChatCompletion.create(
             model="gpt-4",
-            messages=[{'role': 'system', 'content': combining_prompt}],
+            messages=[
+                {'role': 'system', 'content': combining_prompt},
+                {'role': 'function', 'name': 'get_summaries', 'content': function_result}
+            ],
             temperature=0
         )
 
@@ -157,15 +179,17 @@ def main():
             timestamp = metadata_lookup[id_number]['timestamp']
             citations[citation] = f"https://www.youtube.com/watch?v={video_id}&t={timestamp}"
         
-        #Save the final summary
-        save_path = os.path.join(os.path.dirname(__file__), 'data/')
-        with open(save_path + 'final_summary.txt', 'w') as f:
-            f.write(final_summary)
+        #Store as JSON object
+        import json
+        dump = {
+            "summary": final_summary,
+            "citations": citations
+        }
+        with open('summary.json', 'w') as f:
+            json.dump(dump, f)
 
-        #Save the citations
-        with open(save_path + 'citations.txt', 'w') as f:
-            f.write(str(citations))
-            
+        print("Summary written to summary.json")
+
     else:
         print("Not enough documents to summarize with Best Vector Representative method.")
         exit(1)
