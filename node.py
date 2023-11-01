@@ -1,7 +1,5 @@
-import openai
 import os
-
-openai.api_key = os.environ['OPENAI_API_KEY']
+from utils import get_embedding
 
 NULL_ID = '\0'
 
@@ -11,10 +9,6 @@ def is_null(datum) -> bool:
 from hashlib import sha256
 def hash_string(string):
     return sha256(string.encode()).hexdigest()
-
-def get_embedding(text, model="text-embedding-ada-002"):
-    text = text.replace("\n", " ")
-    return openai.Embedding.create(input = [text], model=model)['data'][0]['embedding']
 
 class YTVideoChunk:
     def __init__(self, video_id, transcript, timestamp=0, prev=NULL_ID, next=NULL_ID) -> None:

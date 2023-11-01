@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from node import YTVideo
+from utils import get_embedding
 
 def main(playlist_id):
 
