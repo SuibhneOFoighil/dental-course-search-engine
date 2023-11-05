@@ -182,7 +182,7 @@ def main():
         #Store as JSON object
         import json
         dump = {
-            "summary": final_summary,
+            "themes": final_summary,
             "citations": citations
         }
         with open('summary.json', 'w') as f:
